@@ -54,27 +54,60 @@ class SyntheticDocument:
     words: tuple[str, ...]
 
 
+def sample_phrase(seed: int) -> str:
+    """Draw a training string whose length and casing mirror real document text.
+
+    Single lowercase words leave the encoder blind to the wide, upper-case, numeric
+    fragments a page actually contains, so the sampler covers all of them.
+    """
+
+    rng = random.Random(seed)
+    length = rng.choices((1, 2, 3), weights=(0.45, 0.35, 0.20))[0]
+    phrase = " ".join(rng.choice(WORDS) for _ in range(length))
+    style = rng.random()
+    if style < 0.28:
+        phrase = phrase.upper()
+    elif style < 0.45:
+        phrase = phrase.title()
+    if rng.random() < 0.22:
+        amount = f"${rng.randint(1, 4999)}.{rng.randint(0, 99):02d}"
+        phrase = f"{phrase} {amount}" if rng.random() < 0.6 else amount
+    return phrase
+
+
 def render_word(
     text: str,
     font_path: str | Path,
     *,
     seed: int,
-    canvas_size: tuple[int, int] = (192, 72),
+    canvas_size: tuple[int, int] | None = None,
     augment: bool = True,
 ) -> Image.Image:
-    """Render a word with lightweight print/scan domain randomization."""
+    """Render text with lightweight print/scan domain randomization.
+
+    The canvas defaults to the measured ink extent plus margin, so a three-word phrase
+    keeps the aspect ratio it would have on a page instead of being squeezed into a
+    fixed box that no inference crop ever matches.
+    """
 
     rng = random.Random(seed)
-    width, height = canvas_size
-    background = rng.randint(242, 255)
-    canvas = Image.new("L", (width, height), background)
-    draw = ImageDraw.Draw(canvas)
     size = rng.randint(31, 45) if augment else 38
     font = ImageFont.truetype(str(font_path), size=size)
-    bbox = draw.textbbox((0, 0), text, font=font)
-    text_width, text_height = bbox[2] - bbox[0], bbox[3] - bbox[1]
-    x = max(2, (width - text_width) // 2 + (rng.randint(-6, 6) if augment else 0))
-    y = max(1, (height - text_height) // 2 - bbox[1] + (rng.randint(-4, 4) if augment else 0))
+    ruler = ImageDraw.Draw(Image.new("L", (8, 8)))
+    bbox = ruler.textbbox((0, 0), text, font=font)
+    text_width, text_height = int(bbox[2] - bbox[0]), int(bbox[3] - bbox[1])
+    if canvas_size is None:
+        margin_x = rng.randint(6, 20) if augment else 12
+        margin_y = rng.randint(5, 14) if augment else 10
+        width = text_width + 2 * margin_x
+        height = text_height + 2 * margin_y
+    else:
+        width, height = canvas_size
+    background = rng.randint(242, 255)
+    canvas = Image.new("L", (max(width, 16), max(height, 16)), background)
+    draw = ImageDraw.Draw(canvas)
+    x = max(2, (width - text_width) // 2 + (rng.randint(-4, 4) if augment else 0))
+    y = max(1, (height - text_height) // 2 - bbox[1] + (rng.randint(-3, 3) if augment else 0))
     ink = rng.randint(0, 35)
     draw.text((x, y), text, font=font, fill=ink)
 
@@ -120,9 +153,8 @@ class SyntheticFontDataset(Dataset[tuple[torch.Tensor, int]]):
         label = index // self.samples_per_font
         local_index = index % self.samples_per_font
         sample_seed = self.seed + label * 1_000_003 + local_index
-        word = WORDS[sample_seed % len(WORDS)]
         image = render_word(
-            word,
+            sample_phrase(sample_seed),
             self.fonts[label].path,
             seed=sample_seed,
             augment=self.augment,
