@@ -72,10 +72,19 @@ select = ["E", "F", "I", "N", "UP", "B", "SIM", "RUF"]
 ignore = ["E501"]
 
 [tool.mypy]
-python_version = "3.11"
+# Analysis target is 3.12: numpy's bundled stubs use PEP 695 syntax that a 3.11
+# target cannot parse. Runtime support still starts at 3.11 and CI proves it.
+python_version = "3.12"
 strict = true
 warn_unreachable = true
 
 [[tool.mypy.overrides]]
-module = ["fontTools.*", "gradio", "scipy.*"]
+module = ["fontTools.*", "scipy.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# Gradio ships partial annotations; skipping them keeps the demo module checkable
+# whether or not the optional extra is installed.
+module = ["gradio", "gradio.*"]
+follow_imports = "skip"
 ignore_missing_imports = true
