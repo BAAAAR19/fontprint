@@ -222,6 +222,7 @@ def run_benchmark(
         "documents": documents,
         "seed": seed,
         "use_proposals": use_proposals,
+        "correction": analyzer.correction,
         "overlap": overlap,
         "fonts": [font.label for font in fonts],
     }

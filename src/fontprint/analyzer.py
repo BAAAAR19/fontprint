@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
+from typing import Literal
 
 import numpy as np
 import torch
@@ -13,8 +14,11 @@ from PIL import Image, ImageDraw, ImageFont
 from fontprint.calibration import DistanceCalibrator
 from fontprint.checkpoint import load_checkpoint
 from fontprint.index import PrototypeIndex
+from fontprint.metrics import holm_adjusted
 from fontprint.model import StyleEncoder
 from fontprint.preprocessing import Box, propose_regions, to_tensor
+
+Correction = Literal["holm", "none"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -23,6 +27,7 @@ class RegionEvidence:
     box: tuple[int, int, int, int]
     anomaly_score: float
     p_value: float
+    adjusted_p_value: float
     is_anomaly: bool
     nearest_style: str | None
     style_similarity: float | None
@@ -34,6 +39,7 @@ class AnalysisReport:
     review_recommended: bool
     reference_region_id: int
     threshold: float
+    correction: Correction
     regions: tuple[RegionEvidence, ...]
     caveat: str = (
         "Fontprint measures typographic inconsistency; it does not establish that a document "
@@ -46,6 +52,7 @@ class AnalysisReport:
             "review_recommended": self.review_recommended,
             "reference_region_id": self.reference_region_id,
             "threshold": self.threshold,
+            "correction": self.correction,
             "regions": [asdict(region) for region in self.regions],
             "caveat": self.caveat,
         }
@@ -62,12 +69,14 @@ class FontprintAnalyzer:
         *,
         image_size: tuple[int, int] = (64, 160),
         device: str | torch.device = "cpu",
+        correction: Correction = "holm",
     ) -> None:
         self.device = torch.device(device)
         self.encoder = encoder.to(self.device).eval()
         self.calibrator = calibrator
         self.index = index
         self.image_size = image_size
+        self.correction = correction
 
     @classmethod
     def from_checkpoint(
@@ -75,6 +84,7 @@ class FontprintAnalyzer:
         path: str | Path,
         *,
         device: str | torch.device = "cpu",
+        correction: Correction = "holm",
     ) -> FontprintAnalyzer:
         encoder, calibrator, index, metadata = load_checkpoint(path, device)
         return cls(
@@ -83,6 +93,7 @@ class FontprintAnalyzer:
             index,
             image_size=metadata["image_size"],
             device=device,
+            correction=correction,
         )
 
     @torch.inference_mode()
@@ -109,6 +120,14 @@ class FontprintAnalyzer:
         medoid_index = int(np.argmin(np.median(pairwise, axis=1)))
         scores = pairwise[:, medoid_index]
 
+        p_values = np.array([self.calibrator.p_value(float(score)) for score in scores])
+        # The medoid is the reference, not a hypothesis, so it stays out of the family.
+        tested = np.array([index != medoid_index for index in range(len(regions))])
+        adjusted = p_values.copy()
+        if self.correction == "holm":
+            adjusted[tested] = holm_adjusted(p_values[tested])
+        adjusted[~tested] = 1.0
+
         evidence: list[RegionEvidence] = []
         for region_id, (box, score, embedding) in enumerate(
             zip(regions, scores, embeddings, strict=True)
@@ -119,9 +138,11 @@ class FontprintAnalyzer:
                     region_id=region_id,
                     box=box.as_tuple(),
                     anomaly_score=float(score),
-                    p_value=self.calibrator.p_value(float(score)),
-                    is_anomaly=region_id != medoid_index
-                    and self.calibrator.is_anomaly(float(score)),
+                    p_value=float(p_values[region_id]),
+                    adjusted_p_value=float(adjusted[region_id]),
+                    is_anomaly=bool(
+                        tested[region_id] and adjusted[region_id] <= self.calibrator.alpha
+                    ),
                     nearest_style=matches[0].label if matches else None,
                     style_similarity=matches[0].similarity if matches else None,
                 )
@@ -133,6 +154,7 @@ class FontprintAnalyzer:
             review_recommended=review,
             reference_region_id=medoid_index,
             threshold=self.calibrator.threshold,
+            correction=self.correction,
             regions=tuple(evidence),
         )
 
@@ -145,7 +167,10 @@ class FontprintAnalyzer:
             color = (216, 62, 66, 255) if region.is_anomaly else (31, 139, 110, 230)
             fill = (216, 62, 66, 35) if region.is_anomaly else (31, 139, 110, 22)
             draw.rectangle(region.box, fill=fill, outline=color, width=3)
-            label = f"#{region.region_id} d={region.anomaly_score:.3f} p={region.p_value:.3f}"
+            label = (
+                f"#{region.region_id} d={region.anomaly_score:.3f} "
+                f"p={region.p_value:.3f} adj={region.adjusted_p_value:.3f}"
+            )
             x1, y1, _, _ = region.box
             label_box = draw.textbbox((x1, max(0, y1 - 16)), label, font=font)
             draw.rectangle(label_box, fill=(17, 24, 28, 220))

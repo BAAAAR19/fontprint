@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, cast
 
 import typer
 from PIL import Image, ImageDraw
 
 from fontprint import __version__
-from fontprint.analyzer import FontprintAnalyzer
+from fontprint.analyzer import Correction, FontprintAnalyzer
 from fontprint.benchmark import run_benchmark
 from fontprint.config import TrainConfig
 from fontprint.export import export_onnx
@@ -122,10 +122,21 @@ def analyze(
         "artifacts/fontprint.pt"
     ),
     overlay: Annotated[Path | None, typer.Option("--overlay", "-o")] = None,
+    correction: Annotated[
+        str,
+        typer.Option(
+            "--correction",
+            help="Multiple-testing correction across regions: `holm` or `none`.",
+        ),
+    ] = "holm",
 ) -> None:
     """Analyze a document and print machine-readable evidence."""
 
-    analyzer = FontprintAnalyzer.from_checkpoint(checkpoint)
+    if correction not in {"holm", "none"}:
+        raise typer.BadParameter("correction must be 'holm' or 'none'")
+    analyzer = FontprintAnalyzer.from_checkpoint(
+        checkpoint, correction=cast(Correction, correction)
+    )
     with Image.open(image) as document:
         report = analyzer.analyze(document)
         typer.echo(json.dumps(report.to_dict(), indent=2))
@@ -150,14 +161,22 @@ def benchmark(
     output: Annotated[Path | None, typer.Option("--output", "-o")] = Path(
         "artifacts/benchmark.json"
     ),
+    correction: Annotated[
+        str,
+        typer.Option("--correction", help="Multiple-testing correction: `holm` or `none`."),
+    ] = "holm",
     markdown: Annotated[bool, typer.Option(help="Print a paste-ready summary table.")] = False,
 ) -> None:
     """Measure end-to-end detection quality on controlled synthetic substitutions."""
 
+    if correction not in {"holm", "none"}:
+        raise typer.BadParameter("correction must be 'holm' or 'none'")
     fonts = discover_fonts(font_roots, limit=20)
     if len(fonts) < 2:
         raise typer.BadParameter("at least two usable local fonts are required")
-    analyzer = FontprintAnalyzer.from_checkpoint(checkpoint)
+    analyzer = FontprintAnalyzer.from_checkpoint(
+        checkpoint, correction=cast(Correction, correction)
+    )
     report = run_benchmark(
         analyzer,
         fonts,

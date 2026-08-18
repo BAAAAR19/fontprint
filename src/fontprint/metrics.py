@@ -45,3 +45,27 @@ def precision_recall_f1(
     denominator = precision + recall
     f1 = 0.0 if denominator == 0 else 2 * precision * recall / denominator
     return precision, recall, f1
+
+
+def holm_adjusted(p_values: np.ndarray) -> np.ndarray:
+    """Holm step-down adjustment for a family of hypothesis tests.
+
+    A page yields one test per region, so an uncorrected 5% per-region level lets a
+    ten-region document raise a false alarm about 40% of the time. Holm controls the
+    family-wise error rate across the page while staying uniformly more powerful than
+    Bonferroni, and it needs no independence assumption -- which matters here, because
+    regions on one page are compared against a shared medoid.
+    """
+
+    values = np.asarray(p_values, dtype=np.float64).reshape(-1)
+    count = values.size
+    if count == 0:
+        return values
+    order = np.argsort(values, kind="stable")
+    # Holm: scale the i-th smallest p-value by the number of tests still standing,
+    # then enforce monotonicity so a later test never looks more significant.
+    scaled = values[order] * (count - np.arange(count))
+    adjusted = np.maximum.accumulate(scaled)
+    result = np.empty_like(adjusted)
+    result[order] = np.clip(adjusted, 0.0, 1.0)
+    return result
