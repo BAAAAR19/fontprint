@@ -126,14 +126,14 @@ def analyze(
         str,
         typer.Option(
             "--correction",
-            help="Multiple-testing correction across regions: `holm` or `none`.",
+            help="Multiple-testing correction across regions: `bh`, `holm`, or `none`.",
         ),
-    ] = "holm",
+    ] = "bh",
 ) -> None:
     """Analyze a document and print machine-readable evidence."""
 
-    if correction not in {"holm", "none"}:
-        raise typer.BadParameter("correction must be 'holm' or 'none'")
+    if correction not in {"bh", "holm", "none"}:
+        raise typer.BadParameter("correction must be 'bh', 'holm', or 'none'")
     analyzer = FontprintAnalyzer.from_checkpoint(
         checkpoint, correction=cast(Correction, correction)
     )
@@ -163,14 +163,14 @@ def benchmark(
     ),
     correction: Annotated[
         str,
-        typer.Option("--correction", help="Multiple-testing correction: `holm` or `none`."),
-    ] = "holm",
+        typer.Option("--correction", help="Multiple-testing correction: `bh`, `holm`, or `none`."),
+    ] = "bh",
     markdown: Annotated[bool, typer.Option(help="Print a paste-ready summary table.")] = False,
 ) -> None:
     """Measure end-to-end detection quality on controlled synthetic substitutions."""
 
-    if correction not in {"holm", "none"}:
-        raise typer.BadParameter("correction must be 'holm' or 'none'")
+    if correction not in {"bh", "holm", "none"}:
+        raise typer.BadParameter("correction must be 'bh', 'holm', or 'none'")
     fonts = discover_fonts(font_roots, limit=20)
     if len(fonts) < 2:
         raise typer.BadParameter("at least two usable local fonts are required")

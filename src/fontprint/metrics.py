@@ -69,3 +69,26 @@ def holm_adjusted(p_values: np.ndarray) -> np.ndarray:
     result = np.empty_like(adjusted)
     result[order] = np.clip(adjusted, 0.0, 1.0)
     return result
+
+
+def benjamini_hochberg(p_values: np.ndarray) -> np.ndarray:
+    """Benjamini-Hochberg adjusted p-values (q-values) for a family of tests.
+
+    Holm asks that the page raise no false alarm at all, which is the right question
+    for an automated verdict and the wrong one for triage: it spends all its power
+    protecting against a single mistake. BH instead bounds the expected share of
+    flagged regions that are false, so a reviewer handed ten boxes can expect about
+    half a bad one at q = 0.05 rather than none at the cost of seeing nothing.
+    """
+
+    values = np.asarray(p_values, dtype=np.float64).reshape(-1)
+    count = values.size
+    if count == 0:
+        return values
+    order = np.argsort(values, kind="stable")
+    scaled = values[order] * count / np.arange(1, count + 1)
+    # Step-up: an earlier hypothesis can never be less significant than a later one.
+    adjusted = np.minimum.accumulate(scaled[::-1])[::-1]
+    result = np.empty_like(adjusted)
+    result[order] = np.clip(adjusted, 0.0, 1.0)
+    return result

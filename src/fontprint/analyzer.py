@@ -14,11 +14,15 @@ from PIL import Image, ImageDraw, ImageFont
 from fontprint.calibration import DistanceCalibrator
 from fontprint.checkpoint import load_checkpoint
 from fontprint.index import PrototypeIndex
-from fontprint.metrics import holm_adjusted
+from fontprint.metrics import benjamini_hochberg, holm_adjusted
 from fontprint.model import StyleEncoder
 from fontprint.preprocessing import Box, propose_regions, to_tensor
 
-Correction = Literal["holm", "none"]
+Correction = Literal["bh", "holm", "none"]
+
+# Triage default: bound the share of flagged regions that are false, rather than
+# insisting no page ever raises a false flag.
+CORRECTIONS = {"bh": benjamini_hochberg, "holm": holm_adjusted}
 
 
 @dataclass(frozen=True, slots=True)
@@ -69,7 +73,7 @@ class FontprintAnalyzer:
         *,
         image_size: tuple[int, int] = (64, 160),
         device: str | torch.device = "cpu",
-        correction: Correction = "holm",
+        correction: Correction = "bh",
     ) -> None:
         self.device = torch.device(device)
         self.encoder = encoder.to(self.device).eval()
@@ -84,7 +88,7 @@ class FontprintAnalyzer:
         path: str | Path,
         *,
         device: str | torch.device = "cpu",
-        correction: Correction = "holm",
+        correction: Correction = "bh",
     ) -> FontprintAnalyzer:
         encoder, calibrator, index, metadata = load_checkpoint(path, device)
         return cls(
@@ -124,8 +128,9 @@ class FontprintAnalyzer:
         # The medoid is the reference, not a hypothesis, so it stays out of the family.
         tested = np.array([index != medoid_index for index in range(len(regions))])
         adjusted = p_values.copy()
-        if self.correction == "holm":
-            adjusted[tested] = holm_adjusted(p_values[tested])
+        adjust = CORRECTIONS.get(self.correction)
+        if adjust is not None:
+            adjusted[tested] = adjust(p_values[tested])
         adjusted[~tested] = 1.0
 
         evidence: list[RegionEvidence] = []
