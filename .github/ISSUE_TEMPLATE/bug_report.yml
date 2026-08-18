@@ -1,0 +1,43 @@
+name: Bug report
+description: Something in the pipeline behaves incorrectly.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please do not attach real documents, proprietary fonts, or anything sensitive.
+        Reproduce with `fontprint synthesize` specimens or openly licensed fonts instead.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Include the command you ran and the full error or unexpected output.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect instead?
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Fontprint version
+      description: Output of `fontprint --version`.
+      placeholder: "0.1.0"
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Python, OS, and device
+      placeholder: "Python 3.12, macOS 15, MPS"
+    validations:
+      required: true
+  - type: textarea
+    id: fonts
+    attributes:
+      label: Font collection
+      description: Which faces were discovered? `fontprint fonts --limit 20` is enough.

@@ -1,0 +1,23 @@
+cff-version: 1.2.0
+title: "Fontprint: open-set typography anomaly detection for document forensics"
+message: "If you use this software or its ideas in your work, please cite it."
+type: software
+authors:
+  - family-names: Benamour
+    given-names: Aymen Abderrahim
+repository-code: "https://github.com/BAAAAR19/MLAYMEN"
+abstract: >-
+  Fontprint learns a font-style metric space with supervised contrastive learning and
+  uses split-conformal calibration to flag document regions whose typography disagrees
+  with the page's dominant style. Font identities held out from optimization measure
+  open-set transfer, and every prediction ships with a distance, a p-value, and a
+  reference region.
+keywords:
+  - metric-learning
+  - conformal-prediction
+  - document-analysis
+  - computer-vision
+  - pytorch
+license: MIT
+version: 0.1.0
+date-released: "2026-08-18"
