@@ -1,0 +1,20 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+.venv/
+dist/
+build/
+.DS_Store
+
+# Generated data and experiments
+data/raw/
+data/processed/
+data/fonts/
+runs/
+artifacts/*
+!artifacts/.gitkeep

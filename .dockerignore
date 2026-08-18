@@ -1,0 +1,9 @@
+.git
+.github
+.venv
+data
+runs
+artifacts/*.pt
+artifacts/*.onnx
+__pycache__
+.pytest_cache

@@ -1,0 +1,81 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "fontprint-ml"
+version = "0.1.0"
+description = "Open-set typography anomaly detection for document forensics."
+readme = "README.md"
+requires-python = ">=3.11,<3.15"
+license = { text = "MIT" }
+authors = [{ name = "Fontprint contributors" }]
+keywords = ["computer-vision", "metric-learning", "document-ai", "forensics", "pytorch"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+  "fonttools>=4.55,<5",
+  "numpy>=2.0,<3",
+  "pillow>=11,<13",
+  "pydantic>=2.9,<3",
+  "pyyaml>=6,<7",
+  "scipy>=1.14,<2",
+  "torch>=2.5,<3",
+  "typer>=0.15,<1",
+]
+
+[project.optional-dependencies]
+api = ["fastapi>=0.115,<1", "python-multipart>=0.0.18,<1", "uvicorn[standard]>=0.34,<1"]
+demo = ["gradio>=5.20,<7"]
+export = [
+  "onnx>=1.17,<2",
+  "onnxruntime>=1.20,<2",
+  "onnxscript>=0.2,<1",
+  "safetensors>=0.5,<1",
+]
+dev = [
+  "fastapi>=0.115,<1",
+  "httpx>=0.28,<1",
+  "mypy>=1.14,<2",
+  "onnx>=1.17,<2",
+  "onnxruntime>=1.20,<2",
+  "onnxscript>=0.2,<1",
+  "pytest>=8.3,<9",
+  "pytest-cov>=6,<8",
+  "python-multipart>=0.0.18,<1",
+  "ruff>=0.9,<1",
+  "safetensors>=0.5,<1",
+  "types-PyYAML>=6.0,<7",
+  "uvicorn[standard]>=0.34,<1",
+]
+
+[project.scripts]
+fontprint = "fontprint.cli:app"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/fontprint"]
+
+[tool.pytest.ini_options]
+addopts = "-q --disable-warnings --strict-markers"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "UP", "B", "SIM", "RUF"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_unreachable = true
+
+[[tool.mypy.overrides]]
+module = ["fontTools.*", "gradio", "scipy.*"]
+ignore_missing_imports = true
