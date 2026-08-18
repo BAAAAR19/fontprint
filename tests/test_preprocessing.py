@@ -30,6 +30,14 @@ def test_region_proposal_ignores_page_border(fonts) -> None:  # type: ignore[no-
     assert boxes == sorted(boxes, key=lambda box: (box.y1 // 8, box.x1))
 
 
+def test_region_proposal_drops_letterbox_wide_strips(fonts) -> None:  # type: ignore[no-untyped-def]
+    document = render_document(fonts[0].path, fonts[1].path, tampered=True)
+    default_boxes = propose_regions(document.image)
+    assert all(box.width <= 8.0 * box.height for box in default_boxes)
+    # Relaxing the cap can only admit more regions, never fewer.
+    assert len(propose_regions(document.image, max_aspect=40.0)) >= len(default_boxes)
+
+
 def test_blank_crop_is_supported() -> None:
     image = Image.new("L", (40, 20), 255)
     assert normalize_crop(image).size == (160, 64)
