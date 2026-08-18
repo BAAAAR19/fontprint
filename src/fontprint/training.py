@@ -9,7 +9,6 @@ from pathlib import Path
 
 import numpy as np
 import torch
-from scipy.stats import rankdata
 from torch import nn
 from torch.utils.data import DataLoader
 
@@ -19,6 +18,7 @@ from fontprint.config import TrainConfig
 from fontprint.fonts import FontRecord, discover_fonts
 from fontprint.index import PrototypeIndex
 from fontprint.losses import SupervisedContrastiveLoss
+from fontprint.metrics import roc_auc
 from fontprint.model import TrainingModel
 from fontprint.synthesis import PKBatchSampler, SyntheticFontDataset
 
@@ -88,17 +88,10 @@ def verification_metrics(embeddings: np.ndarray, targets: np.ndarray) -> dict[st
     rows, columns = np.triu_indices(len(targets), k=1)
     values = distances[rows, columns]
     different = targets[rows] != targets[columns]
-    same_scores, different_scores = values[~different], values[different]
-    combined = np.concatenate([same_scores, different_scores])
-    ranks = rankdata(combined, method="average")
-    positive_ranks = ranks[len(same_scores) :].sum()
-    auc = (positive_ranks - len(different_scores) * (len(different_scores) + 1) / 2) / (
-        len(same_scores) * len(different_scores)
-    )
     return {
-        "heldout_pair_auroc": float(auc),
-        "heldout_same_style_distance": float(same_scores.mean()),
-        "heldout_different_style_distance": float(different_scores.mean()),
+        "heldout_pair_auroc": roc_auc(values, different),
+        "heldout_same_style_distance": float(values[~different].mean()),
+        "heldout_different_style_distance": float(values[different].mean()),
     }
 
 
