@@ -33,7 +33,7 @@ def test_analyzer_flags_a_visual_style_outlier() -> None:
     assert report.verdict == "typographic outlier detected"
     assert report.regions[2].is_anomaly
     assert report.regions[2].adjusted_p_value >= report.regions[2].p_value
-    assert report.to_dict()["correction"] == "holm"
+    assert report.to_dict()["correction"] == "bh"
     assert report.to_dict()["caveat"]
     assert analyzer.draw_overlay(image, report).size == image.size
 

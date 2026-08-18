@@ -6,12 +6,13 @@ Samples are generated at access time from font files already present on the user
 
 ## Generation
 
-Each sample combines a neutral document-domain word with a font face and seeded rendering parameters. Augmentations include small rotation, blur, grayscale sensor noise, contrast variation, positional jitter, font-size variation, and occasional JPEG recompression.
+Each sample combines a neutral document-domain phrase with a font face and seeded rendering parameters. Phrases hold one to three words, are lower-, upper-, or title-cased, and sometimes carry a fictional currency amount, which matches the text forms that appear on a page. The canvas is sized from the measured ink extent so crop aspect ratios match inference. Augmentations include small rotation, blur, grayscale sensor noise, contrast variation, positional jitter, font-size variation, and occasional JPEG recompression.
 
 ## Splits
 
 - Training and seen validation share font identities but use disjoint sample seeds.
 - Open-set holdout reserves entire font identities before optimization. Separate deterministic seeds are used for evaluation and conformal calibration crops.
+- Conformal calibration additionally renders whole clean pages from the held-out faces and cuts them with the production region proposer, so calibration and inference share a distribution.
 - `PKBatchSampler` selects P identities and K samples per identity.
 
 ## Licensing
