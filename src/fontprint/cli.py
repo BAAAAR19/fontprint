@@ -9,7 +9,9 @@ from typing import Annotated
 import typer
 from PIL import Image, ImageDraw
 
+from fontprint import __version__
 from fontprint.analyzer import FontprintAnalyzer
+from fontprint.benchmark import run_benchmark
 from fontprint.config import TrainConfig
 from fontprint.export import export_onnx
 from fontprint.fonts import discover_fonts
@@ -21,6 +23,22 @@ app = typer.Typer(
     rich_markup_mode="markdown",
     help="Open-set typography anomaly detection for document forensics.",
 )
+
+
+def _print_version(value: bool) -> None:
+    if value:
+        typer.echo(f"fontprint {__version__}")
+        raise typer.Exit()
+
+
+@app.callback()
+def main(
+    version: Annotated[
+        bool,
+        typer.Option("--version", callback=_print_version, is_eager=True, help="Show the version."),
+    ] = False,
+) -> None:
+    """Fontprint command-line interface."""
 
 
 @app.command("fonts")
@@ -115,6 +133,43 @@ def analyze(
             overlay.parent.mkdir(parents=True, exist_ok=True)
             analyzer.draw_overlay(document, report).save(overlay)
             typer.echo(f"Wrote overlay to {overlay}", err=True)
+
+
+@app.command()
+def benchmark(
+    checkpoint: Annotated[Path, typer.Option("--checkpoint", "-m", exists=True)] = Path(
+        "artifacts/fontprint.pt"
+    ),
+    font_roots: Annotated[list[Path] | None, typer.Option("--font-root")] = None,
+    documents: Annotated[int, typer.Option(min=2, help="Alternating tampered/clean pages.")] = 24,
+    seed: Annotated[int, typer.Option()] = 101,
+    proposals: Annotated[
+        bool,
+        typer.Option("--proposals/--oracle-boxes", help="Score the OCR-free proposer too."),
+    ] = False,
+    output: Annotated[Path | None, typer.Option("--output", "-o")] = Path(
+        "artifacts/benchmark.json"
+    ),
+    markdown: Annotated[bool, typer.Option(help="Print a paste-ready summary table.")] = False,
+) -> None:
+    """Measure end-to-end detection quality on controlled synthetic substitutions."""
+
+    fonts = discover_fonts(font_roots, limit=20)
+    if len(fonts) < 2:
+        raise typer.BadParameter("at least two usable local fonts are required")
+    analyzer = FontprintAnalyzer.from_checkpoint(checkpoint)
+    report = run_benchmark(
+        analyzer,
+        fonts,
+        documents=documents,
+        seed=seed,
+        use_proposals=proposals,
+    )
+    typer.echo(report.to_markdown() if markdown else json.dumps(report.summary, indent=2))
+    if output is not None:
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(json.dumps(report.to_dict(), indent=2) + "\n", encoding="utf-8")
+        typer.echo(f"Wrote {output}", err=True)
 
 
 @app.command("export-onnx")
