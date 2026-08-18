@@ -26,6 +26,7 @@ class TrainConfig(BaseModel):
     temperature: float = Field(0.08, gt=0)
     classification_weight: float = Field(0.35, ge=0)
     calibration_alpha: float = Field(0.05, gt=0, lt=1)
+    calibration_documents: int = Field(24, ge=4)
     num_workers: int = Field(0, ge=0)
     output_dir: Path = Path("artifacts")
 

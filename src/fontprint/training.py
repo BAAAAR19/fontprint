@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import random
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Sequence
 from pathlib import Path
 
 import numpy as np
@@ -12,6 +12,7 @@ import torch
 from torch import nn
 from torch.utils.data import DataLoader
 
+from fontprint.analyzer import FontprintAnalyzer
 from fontprint.calibration import DistanceCalibrator
 from fontprint.checkpoint import save_checkpoint
 from fontprint.config import TrainConfig
@@ -19,8 +20,9 @@ from fontprint.fonts import FontRecord, discover_fonts
 from fontprint.index import PrototypeIndex
 from fontprint.losses import SupervisedContrastiveLoss
 from fontprint.metrics import roc_auc
-from fontprint.model import TrainingModel
-from fontprint.synthesis import PKBatchSampler, SyntheticFontDataset
+from fontprint.model import StyleEncoder, TrainingModel
+from fontprint.preprocessing import propose_regions
+from fontprint.synthesis import PKBatchSampler, SyntheticFontDataset, render_document
 
 ProgressCallback = Callable[[dict[str, float]], None]
 
@@ -93,6 +95,44 @@ def verification_metrics(embeddings: np.ndarray, targets: np.ndarray) -> dict[st
         "heldout_same_style_distance": float(values[~different].mean()),
         "heldout_different_style_distance": float(values[different].mean()),
     }
+
+
+def document_calibration_scores(
+    encoder: StyleEncoder,
+    fonts: Sequence[FontRecord],
+    *,
+    image_size: tuple[int, int],
+    device: torch.device,
+    documents: int = 24,
+    seed: int = 17,
+) -> np.ndarray:
+    """Collect region-to-medoid distances from style-consistent synthetic pages.
+
+    Conformal validity needs the calibration scores and the test scores to come from the
+    same distribution. Word-crop groups do not: inference scores regions cut out of a
+    rendered page by the OCR-free proposer, at page sizes and casings the crop sampler
+    never sees. Calibrating through the deployed path instead keeps alpha meaningful.
+    """
+
+    probe = FontprintAnalyzer(
+        encoder,
+        DistanceCalibrator(np.array([0.0, 1.0], dtype=np.float32)),
+        image_size=image_size,
+        device=device,
+    )
+    scores: list[float] = []
+    for step in range(documents):
+        font = fonts[step % len(fonts)]
+        document = render_document(font.path, None, tampered=False, seed=seed + step * 13)
+        regions = propose_regions(document.image)
+        if len(regions) < 3:
+            continue
+        embeddings = probe.embed_regions(document.image.convert("RGB"), regions)
+        pairwise = np.clip(1.0 - embeddings @ embeddings.T, 0.0, 2.0)
+        medoid = int(np.argmin(np.median(pairwise, axis=1)))
+        distances = np.delete(pairwise[:, medoid], medoid)
+        scores.extend(float(value) for value in distances)
+    return np.asarray(scores, dtype=np.float32)
 
 
 def _resolve_fonts(config: TrainConfig) -> tuple[list[FontRecord], list[FontRecord]]:
@@ -213,13 +253,30 @@ def train_model(
     calibration_embeddings, calibration_targets = collect_embeddings(
         model, calibration_loader, target_device
     )
-    calibrator = DistanceCalibrator.fit(
+    word_calibrator = DistanceCalibrator.fit(
         calibration_embeddings,
         calibration_targets,
         alpha=config.calibration_alpha,
         seed=config.seed,
     )
+    page_scores = document_calibration_scores(
+        model.encoder,
+        holdout_fonts,
+        image_size=config.image_size,
+        device=target_device,
+        documents=config.calibration_documents,
+        seed=config.seed + 3_600_000,
+    )
+    # Prefer the page-matched null distribution; fall back only if it is unusably small.
+    calibrator = (
+        DistanceCalibrator(page_scores, config.calibration_alpha)
+        if page_scores.size >= 32
+        else word_calibrator
+    )
     metrics["calibration_threshold"] = calibrator.threshold
+    metrics["calibration_source"] = 1.0 if calibrator is not word_calibrator else 0.0
+    metrics["calibration_samples"] = float(len(calibrator.scores))
+    metrics["word_group_threshold"] = word_calibrator.threshold
     metrics["num_fonts"] = float(len(fonts))
 
     config.output_dir.mkdir(parents=True, exist_ok=True)
