@@ -18,8 +18,8 @@ automatically when PyTorch finds one, but nothing here requires it.
 ## Step 1 — Install
 
 ```bash
-git clone https://github.com/BAAAAR19/MLAYMEN.git
-cd MLAYMEN
+git clone https://github.com/BAAAAR19/fontprint.git
+cd fontprint
 python -m venv .venv
 source .venv/bin/activate          # Windows: .venv\Scripts\activate
 pip install -e '.[dev,demo]'

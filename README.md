@@ -7,7 +7,7 @@
 **Open-set typography anomaly detection for document forensics.**
 Metric learning turns word crops into a font-style fingerprint, then calibrated inference highlights regions that disagree with the document's dominant typography.
 
-[![CI](https://github.com/BAAAAR19/MLAYMEN/actions/workflows/ci.yml/badge.svg)](https://github.com/BAAAAR19/MLAYMEN/actions/workflows/ci.yml)
+[![CI](https://github.com/BAAAAR19/fontprint/actions/workflows/ci.yml/badge.svg)](https://github.com/BAAAAR19/fontprint/actions/workflows/ci.yml)
 ![Python](https://img.shields.io/badge/Python-3.11–3.14-3776AB?logo=python&logoColor=white)
 ![PyTorch](https://img.shields.io/badge/PyTorch-2.5+-EE4C2C?logo=pytorch&logoColor=white)
 ![Coverage](https://img.shields.io/badge/coverage-90%25-23a67a)
@@ -67,8 +67,8 @@ The medoid comparison is robust while fewer than half of the analyzed regions ar
 Full walkthrough with expected output: **[docs/USAGE.md](docs/USAGE.md)**.
 
 ```bash
-git clone https://github.com/BAAAAR19/MLAYMEN.git
-cd MLAYMEN
+git clone https://github.com/BAAAAR19/fontprint.git
+cd fontprint
 python -m venv .venv
 source .venv/bin/activate
 pip install -e '.[dev,demo]'

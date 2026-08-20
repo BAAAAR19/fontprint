@@ -9,7 +9,7 @@ description = "Open-set typography anomaly detection for document forensics."
 readme = "README.md"
 requires-python = ">=3.11,<3.15"
 license = { text = "MIT" }
-authors = [{ name = "Fontprint contributors" }]
+authors = [{ name = "Aymen Abderrahim Benamour" }]
 keywords = ["computer-vision", "metric-learning", "document-ai", "forensics", "pytorch"]
 classifiers = [
   "Development Status :: 3 - Alpha",

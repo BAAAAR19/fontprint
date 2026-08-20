@@ -5,7 +5,7 @@ type: software
 authors:
   - family-names: Benamour
     given-names: Aymen Abderrahim
-repository-code: "https://github.com/BAAAAR19/MLAYMEN"
+repository-code: "https://github.com/BAAAAR19/fontprint"
 abstract: >-
   Fontprint learns a font-style metric space with supervised contrastive learning and
   uses split-conformal calibration to flag document regions whose typography disagrees
